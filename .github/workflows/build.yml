@@ -1,0 +1,52 @@
+name: Build TWRP for OnePlus 13R (giulia)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Set up Git identity
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: Initialize repo
+      run: |
+        mkdir -p workspace && cd workspace
+        repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
+
+    - name: Add local manifest for giulia
+      run: |
+        cd workspace
+        mkdir -p .repo/local_manifests
+        cat <<EOF > .repo/local_manifests/giulia.xml
+<manifest>
+  <remote name="github" fetch="https://github.com/" />
+  <project name="mujammilk-476/device_oneplus_giulia-TWRP" path="device/oneplus/giulia" remote="github" revision="android-12.1" />
+</manifest>
+EOF
+
+    - name: Sync repo
+      run: |
+        cd workspace
+        repo sync --force-sync --no-clone-bundle --no-tags -j$(nproc)
+
+    - name: Build TWRP
+      run: |
+        cd workspace
+        source build/envsetup.sh
+        export ALLOW_MISSING_DEPENDENCIES=true
+        lunch twrp_giulia-eng
+        mka recoveryimage
+
+    - name: Upload built image
+      uses: actions/upload-artifact@v3
+      with:
+        name: twrp-output
+        path: workspace/out/target/product/giulia/recovery.img
